@@ -18,10 +18,10 @@ G = 9.8                     # Gravity acceleration (m/s**2)
 def main():
 
     # Set up initial conditions
-    theta1_0 = np.pi / 5        # Initial y position (m)
-    theta1_dot_0 = 0            # Initial x position (m)
-    theta2_0 = 5 * np.pi / 8    # Initial y position (m)
-    theta2_dot_0 = 0            # Initial x position (m)
+    theta1_0 = np.pi / 5        # Initial angle of arm 1 (rad)
+    theta1_dot_0 = 0            # Initial angular velocity of arm 1 (rad/s)
+    theta2_0 = 5 * np.pi / 8    # Initial angle of arm 2 (rad)
+    theta2_dot_0 = 0            # Initial angular velocity of arm 2 (rad/s)
 
     initial = np.array([theta1_0, theta1_dot_0, theta2_0, theta2_dot_0])
     t_span = np.linspace(0, 10, 10 * 30)
@@ -87,7 +87,7 @@ def calculate_LHS_vec(Z):
 def animate_pendulum(t_span, xy, scale=1.0):
     '''
     Takes the points in time ((N,) array) and the (x, y) points of each mass
-    ((N, 4) array) and creates a plot that shows the pendulum motion live.
+    ((N, 4) array) and creates a plot that shows the pendulum motion.
 
     scale is a float that will scale the playback speed. At 2 the playback will
     happen at twice the actual speed
@@ -122,14 +122,14 @@ def animate_pendulum(t_span, xy, scale=1.0):
         line.set_data(mass1, mass2)
         mass1_point.set_data(xy[i, 0], xy[i, 1])
         mass2_point.set_data(xy[i, 2], xy[i, 3])
-        time_text.set_text('time = {:.1f}s'.format(i * dt))
+        time_text.set_text('time={:.1f}s'.format(i * dt))
         return line, mass1_point, mass2_point, time_text
 
     pendulumAnimation = animation.FuncAnimation(
         figure,
         animate,
         np.arange(1, xy.shape[0]),
-        interval=25,
+        interval=int(dt * 1e3),
         blit=True,
         init_func=initialize_animation)
 
