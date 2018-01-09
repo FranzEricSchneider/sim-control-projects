@@ -12,25 +12,86 @@ TODO
 # Set up constants
 MASS = 2                 # Mass (Kg)
 G = 9.8                  # Gravity acceleration (m/s**2)
+DRAG_COEFFICIENT = 0.1   # Something meaningless (see M_component_drag)
 SIM_LENGTH = 10          # Seconds
 SAMPLES_PER_SECOND = 30  # Used in the solver
 
-def main():
 
+def main():
     # Set up initial conditions
     position_0 = np.array([1.0,  1.5, 2.5])  # Initial (x, y, z) position (m)
     velocity_0 = np.array([0.0, -0.1, 0.5])  # Initial (x, y, z) velocity (m/s)
-
     initial = np.hstack((position_0, velocity_0))
     t_span = np.linspace(0, SIM_LENGTH, SIM_LENGTH * SAMPLES_PER_SECOND)
-    zout = integrate.odeint(falling_point_ode, initial, t_span)
 
-    animate_point(t_span, zout[:, 0:3])
+    # Run the initial conditions through the ODE
+    parameters = integrate.odeint(falling_point_ode, initial, t_span)
+
+    # Play back the results
+    animate_point(t_span, parameters[:, 0:3])
 
 
-def falling_point_ode(Z, t):
-    zout = np.hstack((Z[3:], np.array([0, 0, -G])))
-    return zout
+def falling_point_ode(parameters, t):
+    '''
+    TODO
+
+    p_dot = M * p, where M is a matrix of the form
+
+    x_dot       [0      0      0      1    0    0    0      ]   x
+    y_dot       [0      0      0      0    1    0    0      ]   y
+    z_dot   =   [0      0      0      0    0    1    0      ] * z
+    x_ddot      [thrust thrust thrust drag 0    0    0      ]   x_dot
+    y_ddot      [thrust thrust thrust 0    drag 0    0      ]   y_dot
+    z_ddot      [thrust thrust thrust 0    0    drag gravity]   z_dot
+                                                                1
+    '''
+
+    RHS_vector = np.hstack((parameters, 1.0))
+    M = M_component_velocity(parameters) +\
+        M_component_gravity(parameters) +\
+        M_component_drag(parameters) +\
+        M_component_thrust(parameters)
+    parameters_dot = M.dot(RHS_vector)
+    return parameters_dot
+
+
+def M_component_empty(parameters):
+    return np.zeros((len(parameters), len(parameters) + 1))
+
+
+def M_component_velocity(parameters):
+    matrix = M_component_empty(parameters)
+    matrix[0, 3] = 1.0
+    matrix[1, 4] = 1.0
+    matrix[2, 5] = 1.0
+    return matrix
+
+
+def M_component_gravity(parameters):
+    matrix = M_component_empty(parameters)
+    matrix[5, 6] = -G
+    return matrix
+
+
+def M_component_drag(parameters):
+    '''
+    Represents drag as a linear term
+    '''
+    # Drag should really be a squared term:
+    # http://www.softschools.com/formulas/physics/air_resistance_formula/85/
+    # TODO: Look up how to do that correctly
+    matrix = M_component_empty(parameters)
+    matrix[3, 3] = -DRAG_COEFFICIENT
+    matrix[4, 4] = -DRAG_COEFFICIENT
+    matrix[5, 5] = -DRAG_COEFFICIENT
+    return matrix
+
+
+def M_component_thrust(parameters):
+    '''
+    TODO: Decide on strategy
+    '''
+    return M_component_empty(parameters)
 
 
 def animate_point(t_span, xyz, scale=1.0):
@@ -47,7 +108,7 @@ def animate_point(t_span, xyz, scale=1.0):
     # Attaching 3D axis to the figure
     figure = plt.figure()
     axes = figure.add_subplot(111, projection='3d')
-    
+
     # Setting the axes properties
     axes.set_aspect('equal')
     axes.grid()
@@ -79,7 +140,6 @@ def animate_point(t_span, xyz, scale=1.0):
         animate,
         np.arange(1, xyz.shape[0]),
         interval=int(dt * 1e3),
-        blit=True,
         init_func=initialize_animation)
 
     plt.show()
