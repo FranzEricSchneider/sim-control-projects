@@ -1,5 +1,5 @@
 from pid import PIDArduino
-from kettle import Kettle
+from plant import Kettle
 from collections import deque, namedtuple
 import sys
 import math
@@ -21,19 +21,10 @@ def parser_add_args(parser):
     parser.add_argument(
         '-p', '--pid', dest='pid', nargs=4, metavar=('name', 'kp', 'ki', 'kd'),
         default=None, action='append', help='simulate a PID controller')
-    parser.add_argument(
-        '-a', '--atune', dest='autotune', default=False,
-        action='store_true', help='simulate autotune')
 
     parser.add_argument(
         '-v', '--verbose', dest='verbose', default=0,
         action='count', help='be verbose')
-    parser.add_argument(
-        '-e', '--export', dest='export', default=False,
-        action='store_true', help='export data to a .csv file')
-    parser.add_argument(
-        '-n', '--noplot', dest='noplot', default=False,
-        action='store_true', help='do not plot the results')
 
     parser.add_argument(
         '-t', '--temp', dest='kettle_temp', metavar='T', default=40.0,
@@ -75,16 +66,6 @@ def parser_add_args(parser):
     parser.add_argument(
         '--maxout', dest='out_max', metavar='x', default=100.0,
         type=float, help='maximum PID controller output (default: 100)')
-
-
-def write_csv(sim):
-    filename = sim.name + '.csv'
-    with open(filename, 'w+') as csv:
-        csv.write('timestamp;output;sensor_temp;heater_temp\n')
-
-        for i in range(0, len(sim.timestamps)):
-            csv.write('{0};{1:.2f};{2:.2f};{3:.2f}\n'.format(
-                sim.timestamps[i], sim.outputs[i], sim.sensor_temps[i], sim.heater_temps[i]))
 
 
 def sim_update(sim, timestamp, output, args):
@@ -203,14 +184,9 @@ def simulate_pid(args):
         if args.verbose > 0:
             print()
 
-    if args.export:
-        for sim in sims:
-            write_csv(sim)
-
-    if not args.noplot:
-        title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
-            args.volume, args.heater_power, args.delay)
-        plot_simulations(sims, title)
+    title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
+        args.volume, args.heater_power, args.delay)
+    plot_simulations(sims, title)
 
 
 if __name__ == '__main__':
@@ -224,7 +200,5 @@ if __name__ == '__main__':
 
         if args.verbose > 1:
             logging.basicConfig(stream=sys.stderr, format=LOG_FORMAT, level=logging.DEBUG)
-        if args.autotune:
-            simulate_autotune(args)
         if args.pid is not None:
             simulate_pid(args)
