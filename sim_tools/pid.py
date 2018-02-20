@@ -19,14 +19,14 @@ class PIDArduino(object):
 
     def __init__(self, sampletime, kp, ki, kd, out_min=float('-inf'),
                  out_max=float('inf'), time=time):
+        if sampletime <= 0:
+            raise ValueError('sampletime must be greater than 0')
         if kp is None:
             raise ValueError('kp must be specified')
         if ki is None:
             raise ValueError('ki must be specified')
         if kd is None:
             raise ValueError('kd must be specified')
-        if sampletime <= 0:
-            raise ValueError('sampletime must be greater than 0')
         if out_min >= out_max:
             raise ValueError('out_min must be less than out_max')
 

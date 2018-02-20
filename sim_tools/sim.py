@@ -13,80 +13,88 @@ import matplotlib.pyplot as plt
 LOG_FORMAT = '%(name)s: %(message)s'
 Simulation = namedtuple(
     'Simulation',
-    ['name', 'sut', 'kettle', 'delayed_temps', 'timestamps',
-     'heater_temps', 'sensor_temps', 'outputs'])
+    ['name', 'controller', 'plant', 'delayed_states', 'timestamps',
+     'plant_states', 'sensor_states', 'outputs'])
 
 
-def parser_add_args(parser):
-    parser.add_argument(
-        '-p', '--pid', dest='pid', nargs=4, metavar=('name', 'kp', 'ki', 'kd'),
-        default=None, action='append', help='simulate a PID controller')
+def simulate_system(args):
+    timestamp = 0  # seconds
+    delayed_temps_len = max(1, round(args.delay / args.sampletime))
 
-    parser.add_argument(
-        '-v', '--verbose', dest='verbose', default=0,
-        action='count', help='be verbose')
+    #### Set up simulation ##########################################
+    #### Fun facts:
+    ######## Simulation is a named tuple, not a class
+    # Create a simulation for each tuple pid(name, kp, ki, kd)
+    sim = Simulation(
+        name=args.pid[0],
+        controller=PIDArduino(
+            args.sampletime, float(args.pid[1]), float(args.pid[2]),
+            float(args.pid[3]), args.out_min, args.out_max, lambda: timestamp),
+        plant=Kettle(args.diameter, args.volume, args.kettle_temp),
+        delayed_states=deque(maxlen=delayed_temps_len),
+        timestamps=[],
+        plant_states=[],
+        sensor_states=[],
+        outputs=[],
+    )
 
-    parser.add_argument(
-        '-t', '--temp', dest='kettle_temp', metavar='T', default=40.0,
-        type=float, help='initial kettle temperature in C (default: 40)')
-    parser.add_argument(
-        '-s', '--setpoint', dest='setpoint', metavar='T', default=45.0,
-        type=float, help='target temperature in C (default: 45)')
-    parser.add_argument(
-        '--ambient', dest='ambient_temp', metavar='T', default=20.0,
-        type=float, help='ambient temperature in C (default: 20)')
+    #### Oh! This is to do time delay! ########################################
+    ######## The system starts off with some delayed data, then later uses
+    ############ delayed temperature to set the output
+    ######## Because delayed_states is a deque with a fixed length, extending
+    ############ data onto the end pushes old data off the front. This saves
+    ############ bookkeeping. The function adds a new data point and delay[0]
+    ############ automatically becomes up to date "delayed" data
+    # Init delayed_states deque for each simulation
+    sim.delayed_states.extend(sim.delayed_states.maxlen * [args.kettle_temp])
 
-    parser.add_argument(
-        '-i', '--interval', dest='interval', metavar='t', default=20,
-        type=int, help='simulated interval in minutes (default: 20)')
-    parser.add_argument(
-        '-d', '--delay', dest='delay', metavar='t', default=15.0,
-        type=float, help='system response delay in seconds (default: 15)')
-    parser.add_argument(
-        '--sampletime', dest='sampletime', metavar='t', default=5.0,
-        type=float, help='temperature sample time in seconds (default: 5)')
+    # Run simulation for specified interval
+    #### The (x60) is because args.interval is in minutes and we want seconds
+    while timestamp < (args.interval * 60):
+        timestamp += args.sampletime
 
-    parser.add_argument(
-        '--volume', dest='volume', metavar='V', default=70.0,
-        type=float, help='kettle content volume in liters (default: 70)')
-    parser.add_argument(
-        '--diameter', dest='diameter', metavar='d', default=50.0,
-        type=float, help='kettle diameter in cm (default: 50)')
+        #### Calculates the reaction of the controller
+        output = sim.controller.calc(sim.delayed_states[0], args.setpoint)
+        output = max(output, 0)
+        output = min(output, 100)
+        #### Calculates the effects of the controller output on the next
+        ######## sensor reading
+        simulation_update(sim, timestamp, output, args)
 
-    parser.add_argument(
-        '--power', dest='heater_power', metavar='P', default=6.0,
-        type=float, help='heater power in kW (default: 6)')
-    parser.add_argument(
-        '--heatloss', dest='heat_loss_factor', metavar='x', default=1.0,
-        type=float, help='kettle heat loss factor (default: 1)')
+        if args.verbose > 0:
+            print('time:    {0} sec'.format(timestamp))
+            print('{0}: {1:.2f}%'.format(sim.name, output))
+            print('temp sensor:    {0:.2f}C'.format(sim.sensor_states[-1]))
+            print('temp heater:    {0:.2f}C'.format(sim.plant_states[-1]))
 
-    parser.add_argument(
-        '--minout', dest='out_min', metavar='x', default=0.0,
-        type=float, help='minimum PID controller output (default: 0)')
-    parser.add_argument(
-        '--maxout', dest='out_max', metavar='x', default=100.0,
-        type=float, help='maximum PID controller output (default: 100)')
-
-
-def sim_update(sim, timestamp, output, args):
-    sim.kettle.heat(timestamp, args.heater_power * (output / 100), args.sampletime)
-    sim.kettle.cool(timestamp, args.sampletime, args.ambient_temp, args.heat_loss_factor)
-    sim.delayed_temps.append(sim.kettle.temperature)
-    sim.timestamps.append(timestamp)
-    sim.outputs.append(output)
-    sim.sensor_temps.append(sim.delayed_temps[0])
-    sim.heater_temps.append(sim.kettle.temperature)
+    title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
+        args.volume, args.heater_power, args.delay)
+    plot_simulation(sim, title)
 
 
-def plot_simulations(simulations, title):
+def simulation_update(simulation, timestamp, output, args):
+    simulation.plant.heat(timestamp,
+                          args.heater_power * (output / 100),
+                          args.sampletime)
+    simulation.plant.cool(timestamp,
+                          args.sampletime,
+                          args.ambient_temp,
+                          args.heat_loss_factor)
+    simulation.delayed_states.append(simulation.plant.temperature)
+    simulation.timestamps.append(timestamp)
+    simulation.outputs.append(output)
+    simulation.sensor_states.append(simulation.delayed_states[0])
+    simulation.plant_states.append(simulation.plant.temperature)
+
+
+def plot_simulation(simulation, title):
     lines = []
     fig, ax1 = plt.subplots()
     upper_limit = 0
 
     # # Try to limit the y-axis to a more relevant area if possible
-    # for sim in simulations:
-    #     m = max(sim.sensor_temps) + 1
-    #     upper_limit = max(upper_limit, m)
+    # m = max(simulation.sensor_states) + 1
+    # upper_limit = max(upper_limit, m)
 
     # if upper_limit > args.setpoint:
     #     lower_limit = args.setpoint - (upper_limit - args.setpoint)
@@ -107,18 +115,17 @@ def plot_simulations(simulations, title):
     ax2.set_ylabel('power (%)')
 
     # Plot temperature and output values
-    for sim in simulations:
-        color = 'b'
-        lines += ax1.plot(
-            sim.timestamps, sim.sensor_temps, color=color,
-            alpha=1.0, label='{0}: temp.'.format(sim.name))
-        lines += ax2.plot(
-            sim.timestamps, sim.outputs, '--', color=color,
-            linewidth=1, alpha=0.7, label='{0}: output'.format(sim.name))
+    color = 'b'
+    lines += ax1.plot(
+        simulation.timestamps, simulation.sensor_states, color=color,
+        alpha=1.0, label='{0}: temp.'.format(simulation.name))
+    lines += ax2.plot(
+        simulation.timestamps, simulation.outputs, '--', color=color,
+        linewidth=1, alpha=0.7, label='{0}: output'.format(simulation.name))
 
     # Create legend
     labels = [l.get_label() for l in lines]
-    offset = math.ceil((1 + len(simulations) * 2) / 3) * 0.05
+    offset = math.ceil(4 / 3) * 0.05
     ax1.legend(lines, labels, loc=9, bbox_to_anchor=(
         0.5, -0.1 - offset), ncol=3)
     fig.subplots_adjust(bottom=0.2 + offset)
@@ -129,76 +136,63 @@ def plot_simulations(simulations, title):
     plt.show()
 
 
-def simulate_pid(args):
-    timestamp = 0  # seconds
-    delayed_temps_len = max(1, round(args.delay / args.sampletime))
-    sims = []
-
-    #### Set up multiple simulations ##########################################
-    #### Fun facts:
-    ######## Simulation is a named tuple, not a class
-    ######## I'm not sure what "sut" is, but it's PID Arduino
-    # Create a simulation for each tuple pid(name, kp, ki, kd)
-    for pid in args.pid:
-        sim = Simulation(
-            pid[0],
-            PIDArduino(
-                args.sampletime, float(pid[1]), float(pid[2]), float(pid[3]),
-                args.out_min, args.out_max, lambda: timestamp),
-            Kettle(args.diameter, args.volume, args.kettle_temp),
-            deque(maxlen=delayed_temps_len),
-            [], [], [], []
-        )
-        sims.append(sim)
-
-    #### Oh! This is to do time delay! ########################################
-    ######## The system starts off with some delayed data, then later uses
-    ############ delayed temperature to set the output
-    ######## Because delayed_temps is a deque with a fixed length, extending
-    ############ data onto the end pushes old data off the front. This saves
-    ############ bookkeeping. The function adds a new data point and delay[0]
-    ############ automatically becomes up to date "delayed" data
-    # Init delayed_temps deque for each simulation
-    for sim in sims:
-        sim.delayed_temps.extend(sim.delayed_temps.maxlen * [args.kettle_temp])
-
-    # Run simulation for specified interval
-    #### The (x60) is because args.interval is in minutes and we want seconds
-    while timestamp < (args.interval * 60):
-        timestamp += args.sampletime
-
-        for sim in sims:
-            #### Calculates the reaction of the controller
-            output = sim.sut.calc(sim.delayed_temps[0], args.setpoint)
-            output = max(output, 0)
-            output = min(output, 100)
-            #### Calculates the effects of the controller output on the next
-            ######## sensor reading
-            sim_update(sim, timestamp, output, args)
-
-            if args.verbose > 0:
-                print('time:    {0} sec'.format(timestamp))
-                print('{0}: {1:.2f}%'.format(sim.name, output))
-                print('temp sensor:    {0:.2f}C'.format(sim.sensor_temps[-1]))
-                print('temp heater:    {0:.2f}C'.format(sim.heater_temps[-1]))
-        if args.verbose > 0:
-            print()
-
-    title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
-        args.volume, args.heater_power, args.delay)
-    plot_simulations(sims, title)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser_add_args(parser)
+    parser.add_argument(
+        '-p', '--pid', nargs=4, metavar=('name', 'kp', 'ki', 'kd'),
+        default=None, help='simulate a PID controller')
+
+    parser.add_argument(
+        '-v', '--verbose', default=False, action='store_true',
+        help='be verbose')
+
+    parser.add_argument(
+        '-t', '--temp', dest='kettle_temp', metavar='T', default=40.0,
+        type=float, help='initial kettle temperature in C (default: 40)')
+    parser.add_argument(
+        '-s', '--setpoint', metavar='T', default=45.0, type=float,
+        help='target temperature in C (default: 45)')
+    parser.add_argument(
+        '--ambient', dest='ambient_temp', metavar='T', default=20.0,
+        type=float, help='ambient temperature in C (default: 20)')
+
+    parser.add_argument(
+        '-i', '--interval', metavar='t', default=20, type=int,
+        help='simulated interval in minutes (default: 20)')
+    parser.add_argument(
+        '-d', '--delay', metavar='t', default=15.0, type=float,
+        help='system response delay in seconds (default: 15)')
+    parser.add_argument(
+        '--sampletime', metavar='t', default=5.0, type=float,
+        help='temperature sample time in seconds (default: 5)')
+
+    parser.add_argument(
+        '--volume', metavar='V', default=70.0, type=float,
+        help='kettle content volume in liters (default: 70)')
+    parser.add_argument(
+        '--diameter', metavar='d', default=50.0, type=float,
+        help='kettle diameter in cm (default: 50)')
+
+    parser.add_argument(
+        '--power', dest='heater_power', metavar='P', default=6.0,
+        type=float, help='heater power in kW (default: 6)')
+    parser.add_argument(
+        '--heatloss', dest='heat_loss_factor', default=1.0,
+        type=float, help='kettle heat loss factor (default: 1)')
+
+    parser.add_argument(
+        '--minout', dest='out_min', default=0.0,
+        type=float, help='minimum PID controller output (default: 0)')
+    parser.add_argument(
+        '--maxout', dest='out_max', default=100.0,
+        type=float, help='maximum PID controller output (default: 100)')
 
     if len(sys.argv) == 1:
         parser.print_help()
     else:
         args = parser.parse_args()
 
-        if args.verbose > 1:
+        if args.verbose:
             logging.basicConfig(stream=sys.stderr, format=LOG_FORMAT, level=logging.DEBUG)
         if args.pid is not None:
-            simulate_pid(args)
+            simulate_system(args)
