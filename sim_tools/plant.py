@@ -7,7 +7,7 @@ class Kettle(object):
     Args:
         diameter (float): Kettle diameter in centimeters.
         volume (float): Content volume in liters.
-        temp (float): Initial content temperature in degree celsius.
+        initial_temp (float): Initial content temperature in degree celsius.
         density (float): Content density.
     """
     # specific heat capacity of water: c = 4.182 kJ / kg * K
@@ -16,9 +16,9 @@ class Kettle(object):
     # thermal conductivity of steel: lambda = 15 W / m * K
     THERMAL_CONDUCTIVITY_STEEL = 15
 
-    def __init__(self, diameter, volume, temp, density=1):
+    def __init__(self, diameter, volume, initial_temp, density=1):
         self._mass = volume * density
-        self._temp = temp
+        self._temp = initial_temp
         radius = diameter / 2
 
         # height in cm
@@ -28,11 +28,26 @@ class Kettle(object):
         self._surface = (2 * math.pi * math.pow(radius, 2) + 2 * math.pi * radius * height) / 10000
 
     @property
-    def temperature(self):
-        """Get the content's temperature"""
+    def sensable_state(self):
+        """Get the content's sensable state, which for the kettle is
+        temperature
+        """
         return self._temp
 
-    def heat(self, timestamp, power, duration, efficiency=0.98):
+    def update(self, power, duration, ambient_temp, efficiency=0.98,
+               heat_loss_factor=1):
+        '''
+        Update the internal state of the kettle based on the controller output
+        (power), the simulation constants (duration), and some external factors
+        (ambient_temp)
+
+        Args:
+            See arguments of heat and cool
+        '''
+        self.heat(power, duration)
+        self.cool(duration, ambient_temp, heat_loss_factor)
+
+    def heat(self, power, duration, efficiency=0.98):
         """Heat the kettle's content.
 
         Args:
@@ -40,11 +55,10 @@ class Kettle(object):
             duration (float): The duration in seconds.
             efficiency (float): The efficiency as number between 0 and 1.
         """
-        power *= (math.sin(math.radians(timestamp)) + 1.0) * 10
         self._temp += self._get_deltaT(power * efficiency, duration)
         return self._temp
 
-    def cool(self, timestamp, duration, ambient_temp, heat_loss_factor=1):
+    def cool(self, duration, ambient_temp, heat_loss_factor=1):
         """Make the content loose heat.
 
         Args:
@@ -57,7 +71,6 @@ class Kettle(object):
         # P = Q / t
         power = ((Kettle.THERMAL_CONDUCTIVITY_STEEL * self._surface
                  * (self._temp - ambient_temp)) / duration)
-        power *= (math.sin(math.radians(timestamp)) + 1.0) * 10
 
         # W to kW
         power /= 1000
