@@ -1,3 +1,7 @@
+https://github.com/hirschmann/pid-autotune
+https://codereview.stackexchange.com/questions/155205/python-pid-simulator-controller-output
+
+
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D

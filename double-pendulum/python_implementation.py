@@ -15,6 +15,7 @@ M1 = 2                      # Mass (Kg)
 M2 = 1                      # Mass (Kg)
 G = 9.8                     # Gravity acceleration (m/s**2)
 
+
 def main():
 
     # Set up initial conditions
@@ -32,6 +33,7 @@ def main():
              # [x for mass 1, y for mass 1, x for mass 2, y for mass 2]
     v  = []  # Speed w/o direction (m/2), of shape (N, 2) where it goes
              # [speed for mass 1, speed for mass 2]
+
     for i in range(len(t_span)):
         x1 = -sin(zout[i, 0]) * L1
         y1 = -cos(zout[i, 0]) * L1
