@@ -147,13 +147,24 @@ class InvertedPendulum(object):
         self._x, self._x_dot, self._theta, self._theta_dot = updated_state_vector[-1]
 
     def plot_state_history(self):
+        '''
+        TODO
+        '''
+        # TODO: Label axes, add a title, and make the time span sensible
         history = self._state_history.copy()
-        for i in range(history.shape[1]):
-            plt.plot(history[:, i], label='{}'.format(i))
+        fig, axes = plt.subplots(2)
+        axes[0].plot(history[:, 0], label='cart x')
+        axes[0].plot(history[:, 1], label='cart x_dot')
+        axes[1].plot(history[:, 2], label='theta')
+        axes[1].plot(history[:, 3], label='theta_dot')
         plt.legend()
         plt.show()
 
     def plot_energy(self):
+        '''
+        TODO
+        '''
+        # TODO: Label axes, add a title, and make the time span sensible
         history = self._state_history.copy()
         # Potential energy = m * g * cos(theta) * L
         PE = self._mass * _G * self._length * np.cos(history[:, 2])

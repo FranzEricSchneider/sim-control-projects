@@ -86,8 +86,8 @@ def simulate_system(args):
         name='Cart PID',
         controller=PIDArduino(
             sampletime=0.01,
-            kp=3.0,
-            ki=1.0,
+            kp=15.0,
+            ki=10.0,
             kd=0.0,
             out_min=-15.0,
             out_max=15.0,
@@ -96,7 +96,7 @@ def simulate_system(args):
                                mass=0.25,
                                x0=0.0,
                                x_dot0=0.0,
-                               theta0=0.0505,
+                               theta0=0.010101,
                                theta_dot0=0.0),
         delayed_states=deque(maxlen=delayed_samples_len),
         timestamps=[],
@@ -106,11 +106,11 @@ def simulate_system(args):
     )
 
     # Init delayed_states deque for each simulation
-    sim.delayed_states.extend(sim.delayed_states.maxlen * [0.0505])
+    sim.delayed_states.extend(sim.delayed_states.maxlen * [0.010101])
 
     # Run simulation for specified interval. The (x60) is because args.interval
     # is in minutes and we want seconds
-    while timestamp < (0.25 * 60):
+    while timestamp < (0.5 * 60):
         timestamp += 0.01
 
         # Calculates controller reaction
@@ -118,7 +118,6 @@ def simulate_system(args):
                                      setpoint=3.1415)
         output = max(output, -15.0)
         output = min(output, 15.0)
-        output = 0.0
         # Calculates the effects of the controller output on the next sensor
         # reading
         simulation_update(sim, timestamp, output, args)
@@ -194,15 +193,6 @@ def simulation_update(simulation, timestamp, output, args):
 def plot_simulation(simulation, title):
     lines = []
     fig, ax1 = plt.subplots()
-    upper_limit = 0
-
-    # # Try to limit the y-axis to a more relevant area if possible
-    # m = max(simulation.sensor_states) + 1
-    # upper_limit = max(upper_limit, m)
-
-    # if upper_limit > args.setpoint:
-    #     lower_limit = args.setpoint - (upper_limit - args.setpoint)
-    #     ax1.set_ylim(lower_limit, upper_limit)
 
     # Create x-axis and first y-axis
     ax1.plot()
