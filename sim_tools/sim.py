@@ -79,13 +79,13 @@ Simulation = namedtuple(
 
 def simulate_system(args):
     timestamp = 0  # seconds
-    delayed_samples_len = max(1, round(0.03 / 0.001))
+    delayed_samples_len = max(1, round(0.03 / 0.01))
 
     # Create a simulation for the tuple pid(kp, ki, kd)
     sim = Simulation(
         name='Cart PID',
         controller=PIDArduino(
-            sampletime=0.001,
+            sampletime=0.01,
             kp=3.0,
             ki=1.0,
             kd=0.0,
@@ -96,10 +96,8 @@ def simulate_system(args):
                                mass=0.25,
                                x0=0.0,
                                x_dot0=0.0,
-                               x_ddot0=0.0,
                                theta0=0.0505,
-                               theta_dot0=0.0,
-                               theta_ddot0=0.0),
+                               theta_dot0=0.0),
         delayed_states=deque(maxlen=delayed_samples_len),
         timestamps=[],
         plant_states=[],
@@ -113,7 +111,7 @@ def simulate_system(args):
     # Run simulation for specified interval. The (x60) is because args.interval
     # is in minutes and we want seconds
     while timestamp < (0.25 * 60):
-        timestamp += 0.001
+        timestamp += 0.01
 
         # Calculates controller reaction
         output = sim.controller.calc(input_val=sim.delayed_states[0],
@@ -133,7 +131,7 @@ def simulate_system(args):
 
 
 def simulation_update(simulation, timestamp, output, args):
-    simulation.plant.update(output, duration=0.001)
+    simulation.plant.update(output, duration=0.01)
     # Add a state reading to the delayed_states queue, which bumps an element
     # off the front
     simulation.delayed_states.append(simulation.plant.sensable_state)

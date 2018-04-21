@@ -100,24 +100,18 @@ class InvertedPendulum(object):
         mass: Mass of point mass at end of pendulum (kg)
         x0: Initial cart position (m)
         x_dot0: Initial cart velocity (m/s)
-        x_ddot0: Initial cart acceleration (m/s^2)
         theta0: Initial arm angle (rad)
         theta_dot0: Initial arm angular velocity (rad/s)
-        theta_ddot0: Initial arm angular acceleration (rad/s^2)
     """
 
-    def __init__(self, length, mass, x0, x_dot0, x_ddot0, theta0, theta_dot0,
-                 theta_ddot0):
+    def __init__(self, length, mass, x0, x_dot0, theta0, theta_dot0):
         self._length = length
         self._mass = mass
         self._x = x0
         self._x_dot = x_dot0
-        self._x_ddot = x_ddot0
         self._theta = theta0
         self._theta_dot = theta_dot0
-        self._theta_ddot = theta_ddot0
-
-        self._state_history = []
+        self._state_history = np.array([[x0, x_dot0, theta0, theta_dot0]])
 
     @property
     def sensable_state(self):
@@ -133,28 +127,38 @@ class InvertedPendulum(object):
         TODO: Break this down further into more things? Like motor voltage
               or wheel slippage or something?
         TODO: Add a disturbance force? Or noise in the motor output?
-        TODO: Should update be based on some sort of ODE thing instead of
-              a linear approximation?
 
         Args:
-            Applied cart acceleration (m/s^2)
+            acceleration: Applied cart acceleration (m/s^2)
+            duration: Amount of time to step forward with odeint (s)
         '''
-        self._save_state()
-        self._update_x(acceleration, duration)
-        self._update_theta(acceleration, duration)
+        t_span = np.linspace(0, duration, 10)
+        state_vector = [self._x, self._x_dot, self._theta, self._theta_dot]
+        # updated_state_vector contains [x, x_dot, theta, theta_dot] over the linspace timespan
+        updated_state_vector = integrate.odeint(
+            func=self.pendulum_ode,
+            y0=state_vector,
+            t=t_span,
+            args=(acceleration, )
+        )
+        # Save the state history as fine-grain as possible
+        self._save_state(updated_state_vector)
+        # Set the current state
+        self._x, self._x_dot, self._theta, self._theta_dot = updated_state_vector[-1]
 
     def plot_state_history(self):
-        history = np.array(self._state_history)
+        history = self._state_history.copy()
         for i in range(history.shape[1]):
             plt.plot(history[:, i], label='{}'.format(i))
         plt.legend()
         plt.show()
 
     def plot_energy(self):
-        history = np.array(self._state_history)
+        history = self._state_history.copy()
         # Potential energy = m * g * cos(theta) * L
-        PE = self._mass * _G * self._length * np.cos(history[:, 3])
-        KE = (self._mass * np.power(self._length * history[:, 4], 2)) / 2
+        PE = self._mass * _G * self._length * np.cos(history[:, 2])
+        # Kinetic energy = (1/2) * m * (L * theta_dot)^2
+        KE = (self._mass * np.power(self._length * history[:, 3], 2)) / 2
         total = PE + KE
         plt.plot(PE, linewidth=2, label='PE')
         plt.plot(KE, linewidth=2, label='KE')
@@ -162,35 +166,27 @@ class InvertedPendulum(object):
         plt.legend()
         plt.show()
 
-    def _save_state(self):
-        self._state_history.append([
-            self._x, self._x_dot, self._x_ddot,
-            self._theta, self._theta_dot, self._theta_ddot
-        ])
+    def _save_state(self, updated_state_vector):
+        self._state_history = np.vstack((self._state_history,
+                                         updated_state_vector))
 
-    def _update_x(self, acceleration, duration):
+    def pendulum_ode(self, state_vector, t, command_x_ddot):
         '''
-        TODO: comment when tested
+        Constructs a derivatized vector that can be passed into an integrator.
+        Here, it will output a vector [x_dot, x_ddot, theta_dot, theta_ddot]
+
+        Args:
+            state_vector: contains the non-derivative values of the equation.
+                In this case it contains [x, x_dot, theta, theta dot]
+            t: time along the time span
+            command_x_ddot: The commanded x_ddot by the controller
         '''
-        self._x_ddot = acceleration
-
-        delta_velocity = self._x_ddot * duration
-        self._x += ((self._x_dot * duration) +\
-                    ((self._x_dot + delta_velocity) * duration)) / 2
-        self._x_dot += delta_velocity
-
-    def _update_theta(self, acceleration, duration):
-        '''
-        TODO: comment when tested
-
-        L * theta_ddot = g * sin(theta) + x_ddot * cos(theta)
-        '''
-        # import ipdb; ipdb.set_trace()
-        gravity_component = _G * np.sin(self._theta)
-        cart_component = acceleration * np.cos(self._theta)
-        self._theta_ddot = (gravity_component + cart_component) / self._length
-
-        delta_velocity = self._theta_ddot * duration 
-        self._theta += ((self._theta_dot * duration) +\
-                        ((self._theta_dot + delta_velocity) * duration)) / 2
-        self._theta_dot += delta_velocity
+        x_dot = state_vector[1]
+        x_ddot = command_x_ddot
+        theta_dot = state_vector[3]
+        # Calculate theta_ddot from the current situation
+        gravity_component = _G * np.sin(state_vector[2])
+        cart_component = x_ddot * np.cos(state_vector[2])
+        theta_ddot = (gravity_component + cart_component) / self._length
+        # Return a derivatized state_vector
+        return np.array([x_dot, x_ddot, theta_dot, theta_ddot])
