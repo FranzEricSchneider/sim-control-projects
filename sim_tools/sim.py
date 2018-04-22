@@ -77,71 +77,6 @@ Simulation = namedtuple(
 #     simulation.plant_states.append(simulation.plant.sensable_state)
 
 
-def simulate_system(args):
-    timestamp = 0  # seconds
-    delayed_samples_len = max(1, round(0.03 / 0.01))
-
-    # Create a simulation for the tuple pid(kp, ki, kd)
-    sim = Simulation(
-        name='Cart PID',
-        controller=PIDArduino(
-            sampletime=0.01,
-            kp=15.0,
-            ki=10.0,
-            kd=0.0,
-            out_min=-15.0,
-            out_max=15.0,
-            time=lambda: timestamp),
-        plant=InvertedPendulum(length=1.0,
-                               mass=0.25,
-                               x0=0.0,
-                               x_dot0=0.0,
-                               theta0=0.010101,
-                               theta_dot0=0.0),
-        delayed_states=deque(maxlen=delayed_samples_len),
-        timestamps=[],
-        plant_states=[],
-        sensor_states=[],
-        outputs=[],
-    )
-
-    # Init delayed_states deque for each simulation
-    sim.delayed_states.extend(sim.delayed_states.maxlen * [0.010101])
-
-    # Run simulation for specified interval. The (x60) is because args.interval
-    # is in minutes and we want seconds
-    while timestamp < (0.5 * 60):
-        timestamp += 0.01
-
-        # Calculates controller reaction
-        output = sim.controller.calc(input_val=sim.delayed_states[0],
-                                     setpoint=3.1415)
-        output = max(output, -15.0)
-        output = min(output, 15.0)
-        # Calculates the effects of the controller output on the next sensor
-        # reading
-        simulation_update(sim, timestamp, output, args)
-
-    title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
-        args.volume, args.heater_power, args.delay)
-    plot_simulation(sim, title)
-    sim.plant.plot_state_history()
-    sim.plant.plot_energy()
-
-
-def simulation_update(simulation, timestamp, output, args):
-    simulation.plant.update(output, duration=0.01)
-    # Add a state reading to the delayed_states queue, which bumps an element
-    # off the front
-    simulation.delayed_states.append(simulation.plant.sensable_state)
-    # Make the simulation read the delayed state value
-    simulation.sensor_states.append(simulation.delayed_states[0])
-    # For the following values just append them to lists of values over time
-    simulation.timestamps.append(timestamp)
-    simulation.outputs.append(output)
-    simulation.plant_states.append(simulation.plant.sensable_state)
-
-
 # def plot_simulation(simulation, title):
 #     lines = []
 #     fig, ax1 = plt.subplots()
@@ -190,6 +125,84 @@ def simulation_update(simulation, timestamp, output, args):
 #     fig.canvas.set_window_title(title)
 #     plt.show()
 
+
+__DELAY = 0.03
+__SAMPLETIME = 0.01
+__PID_0 = 15.0
+__PID_1 = 10.0
+__PID_2 = 0.0
+__OUT_MIN = -15.0
+__OUT_MAX = 15.0
+__SETPOINT = 3.1415
+__TOTAL_INTERVAL = 0.5
+__THETA_0 = 0.010101
+
+
+def simulate_system(args):
+    timestamp = 0.0  # Beginning time (seconds)
+    delayed_samples_len = max(1, round(__DELAY / __SAMPLETIME))
+
+    # Create a simulation for the tuple pid(kp, ki, kd)
+    sim = Simulation(
+        name='Cart PID',
+        controller=PIDArduino(
+            sampletime=__SAMPLETIME,
+            kp=__PID_0,
+            ki=__PID_1,
+            kd=__PID_2,
+            out_min=__OUT_MIN,
+            out_max=__OUT_MAX,
+            time=lambda: timestamp),
+        plant=InvertedPendulum(length=1.0,
+                               mass=0.25,
+                               x0=0.0,
+                               x_dot0=0.0,
+                               theta0=__THETA_0,
+                               theta_dot0=0.0),
+        delayed_states=deque(maxlen=delayed_samples_len),
+        timestamps=[],
+        plant_states=[],
+        sensor_states=[],
+        outputs=[],
+    )
+
+    # Init delayed_states deque for each simulation
+    sim.delayed_states.extend(sim.delayed_states.maxlen * [__THETA_0])
+
+    # Run simulation for specified interval. The (x60) is because args.interval
+    # is in minutes and we want seconds
+    while timestamp < (__TOTAL_INTERVAL * 60):
+        timestamp += __SAMPLETIME
+
+        # Calculates controller reaction
+        output = sim.controller.calc(input_val=sim.delayed_states[0],
+                                     setpoint=__SETPOINT)
+        output = max(output, __OUT_MIN)
+        output = min(output, __OUT_MAX)
+        # Calculates the effects of the controller output on the next sensor
+        # reading
+        simulation_update(sim, timestamp, output, args)
+
+    title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
+        args.volume, args.heater_power, args.delay)
+    plot_simulation(sim, title)
+    sim.plant.plot_state_history()
+    sim.plant.plot_energy()
+
+
+def simulation_update(simulation, timestamp, output, args):
+    simulation.plant.update(output, duration=__SAMPLETIME)
+    # Add a state reading to the delayed_states queue, which bumps an element
+    # off the front
+    simulation.delayed_states.append(simulation.plant.sensable_state)
+    # Make the simulation read the delayed state value
+    simulation.sensor_states.append(simulation.delayed_states[0])
+    # For the following values just append them to lists of values over time
+    simulation.timestamps.append(timestamp)
+    simulation.outputs.append(output)
+    simulation.plant_states.append(simulation.plant.sensable_state)
+
+
 def plot_simulation(simulation, title):
     lines = []
     fig, ax1 = plt.subplots()
@@ -202,7 +215,7 @@ def plot_simulation(simulation, title):
 
     # Draw setpoint line
     lines += [plt.axhline(
-        y=0.0, color='r', linestyle=':', linewidth=0.9, label='setpoint')]
+        y=__SETPOINT, color='r', linestyle=':', linewidth=0.9, label='setpoint')]
 
     # Create second y-axis (power)
     ax2 = ax1.twinx()
