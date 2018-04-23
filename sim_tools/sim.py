@@ -1,4 +1,5 @@
 import argparse
+from ast import literal_eval
 from collections import deque, namedtuple
 import logging
 import math
@@ -50,8 +51,8 @@ Simulation = namedtuple(
 
 #         # Calculates controller reaction
 #         output = sim.controller.calc(sim.delayed_states[0], args.setpoint)
-#         output = max(output, 0)
-#         output = min(output, 100)
+#         output = max(output, args.out_min)
+#         output = min(output, args.out_max)
 #         # Calculates the effects of the controller output on the next sensor
 #         # reading
 #         simulation_update(sim, timestamp, output, args)
@@ -81,14 +82,6 @@ Simulation = namedtuple(
 #     lines = []
 #     fig, ax1 = plt.subplots()
 #     upper_limit = 0
-
-#     # # Try to limit the y-axis to a more relevant area if possible
-#     # m = max(simulation.sensor_states) + 1
-#     # upper_limit = max(upper_limit, m)
-
-#     # if upper_limit > args.setpoint:
-#     #     lower_limit = args.setpoint - (upper_limit - args.setpoint)
-#     #     ax1.set_ylim(lower_limit, upper_limit)
 
 #     # Create x-axis and first y-axis
 #     ax1.plot()
@@ -126,39 +119,31 @@ Simulation = namedtuple(
 #     plt.show()
 
 
-__DELAY = 0.03
-__SAMPLETIME = 0.01
-__PID_0 = 15.0
-__PID_1 = 10.0
-__PID_2 = 0.0
-__OUT_MIN = -15.0
-__OUT_MAX = 15.0
-__SETPOINT = 3.1415
-__TOTAL_INTERVAL = 0.5
-__THETA_0 = 0.010101
-
-
 def simulate_system(args):
     timestamp = 0.0  # Beginning time (seconds)
-    delayed_samples_len = max(1, round(__DELAY / __SAMPLETIME))
+    delayed_samples_len = max(1, round(args.delay / args.sampletime))
+
+    # TODO: comment
+    initial = literal_eval(args.initial_values)
+    assert isinstance(initial, dict)
 
     # Create a simulation for the tuple pid(kp, ki, kd)
     sim = Simulation(
         name='Cart PID',
         controller=PIDArduino(
-            sampletime=__SAMPLETIME,
-            kp=__PID_0,
-            ki=__PID_1,
-            kd=__PID_2,
-            out_min=__OUT_MIN,
-            out_max=__OUT_MAX,
+            sampletime=args.sampletime,
+            kp=float(args.pid[0]),
+            ki=float(args.pid[1]),
+            kd=float(args.pid[2]),
+            out_min=args.out_min,
+            out_max=args.out_max,
             time=lambda: timestamp),
         plant=InvertedPendulum(length=1.0,
                                mass=0.25,
-                               x0=0.0,
-                               x_dot0=0.0,
-                               theta0=__THETA_0,
-                               theta_dot0=0.0),
+                               x0=initial.get('x0', 0.0),
+                               x_dot0=initial.get('x_dot0', 0.0),
+                               theta0=initial.get('theta0', 0.0),
+                               theta_dot0=initial.get('theta_dot0', 0.0)),
         delayed_states=deque(maxlen=delayed_samples_len),
         timestamps=[],
         plant_states=[],
@@ -167,18 +152,20 @@ def simulate_system(args):
     )
 
     # Init delayed_states deque for each simulation
-    sim.delayed_states.extend(sim.delayed_states.maxlen * [__THETA_0])
+    sim.delayed_states.extend(
+        sim.delayed_states.maxlen * [initial.get('theta0', 0.0)]
+    )
 
     # Run simulation for specified interval. The (x60) is because args.interval
     # is in minutes and we want seconds
-    while timestamp < (__TOTAL_INTERVAL * 60):
-        timestamp += __SAMPLETIME
+    while timestamp < (args.interval * 60):
+        timestamp += args.sampletime
 
         # Calculates controller reaction
         output = sim.controller.calc(input_val=sim.delayed_states[0],
-                                     setpoint=__SETPOINT)
-        output = max(output, __OUT_MIN)
-        output = min(output, __OUT_MAX)
+                                     setpoint=args.setpoint)
+        output = max(output, args.out_min)
+        output = min(output, args.out_max)
         # Calculates the effects of the controller output on the next sensor
         # reading
         simulation_update(sim, timestamp, output, args)
@@ -191,7 +178,7 @@ def simulate_system(args):
 
 
 def simulation_update(simulation, timestamp, output, args):
-    simulation.plant.update(output, duration=__SAMPLETIME)
+    simulation.plant.update(output, duration=args.sampletime)
     # Add a state reading to the delayed_states queue, which bumps an element
     # off the front
     simulation.delayed_states.append(simulation.plant.sensable_state)
@@ -215,7 +202,7 @@ def plot_simulation(simulation, title):
 
     # Draw setpoint line
     lines += [plt.axhline(
-        y=__SETPOINT, color='r', linestyle=':', linewidth=0.9, label='setpoint')]
+        y=args.setpoint, color='r', linestyle=':', linewidth=0.9, label='setpoint')]
 
     # Create second y-axis (power)
     ax2 = ax1.twinx()
@@ -233,8 +220,8 @@ def plot_simulation(simulation, title):
     # Create legend
     labels = [l.get_label() for l in lines]
     offset = math.ceil(4 / 3) * 0.05
-    ax1.legend(lines, labels, loc=9, bbox_to_anchor=(
-        0.5, -0.1 - offset), ncol=3)
+    ax1.legend(lines, labels, loc=9, ncol=3,
+               bbox_to_anchor=(0.5, -0.1 - offset))
     fig.subplots_adjust(bottom=0.2 + offset)
 
     # Set title
@@ -254,17 +241,11 @@ if __name__ == '__main__':
         help='be verbose')
 
     parser.add_argument(
-        '-t', '--temp', dest='kettle_temp', metavar='T', default=40.0,
-        type=float, help='initial kettle temperature in C (default: 40)')
-    parser.add_argument(
         '-s', '--setpoint', metavar='T', default=45.0, type=float,
-        help='target temperature in C (default: 45)')
-    parser.add_argument(
-        '--ambient', dest='ambient_temp', metavar='T', default=20.0,
-        type=float, help='ambient temperature in C (default: 20)')
+        help='target sensor value (default: 45)')
 
     parser.add_argument(
-        '-i', '--interval', metavar='t', default=20, type=int,
+        '-i', '--interval', metavar='t', default=20, type=float,
         help='simulated interval in minutes (default: 20)')
     parser.add_argument(
         '-d', '--delay', metavar='t', default=15.0, type=float,
@@ -274,25 +255,35 @@ if __name__ == '__main__':
         help='sensor sample time in seconds (default: 5)')
 
     parser.add_argument(
+        '--out-min', default=0.0,
+        type=float, help='minimum PID controller output (default: 0)')
+    parser.add_argument(
+        '--out-max', default=100.0,
+        type=float, help='maximum PID controller output (default: 100)')
+
+    parser.add_argument(
+        '--initial-values', default='{}', action='store',
+        help='Pass in a dictionary of initial values as a string, specific'
+        ' to each plant')
+
+    parser.add_argument(
+        '-t', '--temp', dest='kettle_temp', metavar='T', default=40.0,
+        type=float, help='initial kettle temperature in C (default: 40)')
+    parser.add_argument(
+        '--ambient', dest='ambient_temp', metavar='T', default=20.0,
+        type=float, help='ambient temperature in C (default: 20)')
+    parser.add_argument(
         '--volume', metavar='V', default=70.0, type=float,
         help='kettle content volume in liters (default: 70)')
     parser.add_argument(
         '--diameter', metavar='d', default=50.0, type=float,
         help='kettle diameter in cm (default: 50)')
-
     parser.add_argument(
         '--power', dest='heater_power', metavar='P', default=6.0,
         type=float, help='heater power in kW (default: 6)')
     parser.add_argument(
         '--heatloss', dest='heat_loss_factor', default=1.0,
         type=float, help='kettle heat loss factor (default: 1)')
-
-    parser.add_argument(
-        '--minout', dest='out_min', default=0.0,
-        type=float, help='minimum PID controller output (default: 0)')
-    parser.add_argument(
-        '--maxout', dest='out_max', default=100.0,
-        type=float, help='maximum PID controller output (default: 100)')
 
     if len(sys.argv) == 1:
         parser.print_help()
