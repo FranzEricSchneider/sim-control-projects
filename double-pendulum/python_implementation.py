@@ -83,6 +83,7 @@ def calculate_LHS_vec(Z):
 
     # Solve for the accelerations
     lhs_vec = np.linalg.inv(M).dot(RHS_vec)
+    # Squeeze removes empty dimensions
     return lhs_vec.squeeze()
 
 
