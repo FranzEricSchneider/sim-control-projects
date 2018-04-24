@@ -20,6 +20,17 @@ Simulation = namedtuple(
 #     timestamp = 0  # seconds
 #     delayed_samples_len = max(1, round(args.delay / args.sampletime))
 
+#     initial = literal_eval(args.initial_values)
+#     assert isinstance(initial, dict)
+#     initial['kettle_temp'] = initial.get('kettle_temp', 40.0)
+#     constants = literal_eval(args.constant_values)
+#     assert isinstance(constants, dict)
+#     constants['ambient_temp'] = constants.get('ambient_temp', 20.0)
+#     constants['volume'] = constants.get('volume', 70.0)
+#     constants['diameter'] = constants.get('diameter', 50.0)
+#     constants['power'] = constants.get('power', 6.0)
+#     constants['heatloss'] = constants.get('heatloss', 1.0)
+
 #     # Create a simulation for the tuple pid(kp, ki, kd)
 #     sim = Simulation(
 #         name='Cart PID',
@@ -261,6 +272,10 @@ if __name__ == '__main__':
         '--out-max', default=100.0,
         type=float, help='maximum PID controller output (default: 100)')
 
+    parser.add_argument(
+        '--constant-values', default='{}', action='store',
+        help='Pass in a dictionary of constants values used throughout the'
+        ' simulation as a string, specific to each plant')
     parser.add_argument(
         '--initial-values', default='{}', action='store',
         help='Pass in a dictionary of initial values as a string, specific'
