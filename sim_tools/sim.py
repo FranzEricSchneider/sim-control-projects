@@ -73,11 +73,10 @@ def simulate_system(args):
     plot_simulation(sim, title)
 
 
-def simulation_update(simulation, timestamp, output, args, constants):
-    simulation.plant.update(constants['heater_power'] * (output / 100),
-                            args.sampletime,
-                            constants['ambient_temp'],
-                            heat_loss_factor=constants['heat_loss_factor'])
+def simulation_update(simulation, timestamp, output, args, constants=None):
+    simulation.plant.update(output,
+                            duration=args.sampletime,
+                            constants=constants)
     # Add a state reading to the delayed_states queue, which bumps an element
     # off the front
     simulation.delayed_states.append(simulation.plant.sensable_state)
@@ -185,19 +184,6 @@ def plot_simulation(simulation, title):
 #     plot_simulation(sim, title)
 #     sim.plant.plot_state_history()
 #     sim.plant.plot_energy()
-
-
-# def simulation_update(simulation, timestamp, output, args):
-#     simulation.plant.update(output, duration=args.sampletime)
-#     # Add a state reading to the delayed_states queue, which bumps an element
-#     # off the front
-#     simulation.delayed_states.append(simulation.plant.sensable_state)
-#     # Make the simulation read the delayed state value
-#     simulation.sensor_states.append(simulation.delayed_states[0])
-#     # For the following values just append them to lists of values over time
-#     simulation.timestamps.append(timestamp)
-#     simulation.outputs.append(output)
-#     simulation.plant_states.append(simulation.plant.sensable_state)
 
 
 # def plot_simulation(simulation, title):

@@ -41,8 +41,7 @@ class Kettle(object):
         """
         return self._temp
 
-    def update(self, power, duration, ambient_temp, efficiency=0.98,
-               heat_loss_factor=1):
+    def update(self, output, duration, constants):
         '''
         Update the internal state of the kettle based on the controller output
         (power), the simulation constants (duration), and some external factors
@@ -50,7 +49,14 @@ class Kettle(object):
 
         Args:
             See arguments of heat and cool
+            Expected constants:
+                ambient_temp
+                efficiency=0.98
+                heat_loss_factor=1
         '''
+        power = (output / 100) * constants['heater_power']
+        ambient_temp = constants['ambient_temp']
+        heat_loss_factor = constants['heat_loss_factor']
         self.heat(power, duration)
         self.cool(duration, ambient_temp, heat_loss_factor)
 
@@ -124,7 +130,7 @@ class InvertedPendulum(object):
         """
         return self._theta
 
-    def update(self, acceleration, duration):
+    def update(self, acceleration, duration, constants=None):
         '''
         Update the internal state of the cart based on the given acceleration
         TODO: Break this down further into more things? Like motor voltage
@@ -135,6 +141,7 @@ class InvertedPendulum(object):
         Args:
             acceleration: Applied cart acceleration (m/s^2)
             duration: Amount of time to step forward with odeint (s)
+            constants: Unused in this plant
         '''
         t_span = np.linspace(self._elapsed_time,
                              self._elapsed_time + duration,
