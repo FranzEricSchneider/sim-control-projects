@@ -68,8 +68,8 @@ def simulate_system(args):
         # reading
         simulation_update(sim, timestamp, output, args)
 
-    title = 'PID simulation, {:.1f}s delay, {:.1f}s sampletime'.format(
-        args.delay, args.sampletime
+    title = '{} simulation, {:.1f}s delay, {:.1f}s sampletime'.format(
+        sim.name, args.delay, args.sampletime
     )
     plot_simulation(sim, title)
 
@@ -114,16 +114,16 @@ def plot_simulation(simulation, title):
 
     # Create second y-axis (power)
     ax2 = ax1.twinx()
-    ax2.set_ylabel('power (%)')
+    ax2.set_ylabel('output')
 
     # Plot sensor and output values
     color = 'b'
     lines += ax1.plot(
         simulation.timestamps, simulation.sensor_states, color=color,
-        alpha=1.0, label='{0}: sensor state.'.format(simulation.name))
+        alpha=1.0, label='sensor state')
     lines += ax2.plot(
         simulation.timestamps, simulation.outputs, '--', color=color,
-        linewidth=1, alpha=0.7, label='{0}: output'.format(simulation.name))
+        linewidth=1, alpha=0.7, label='output')
 
     # Create legend
     labels = [l.get_label() for l in lines]
@@ -144,7 +144,7 @@ def plot_simulation(simulation, title):
 # Kettle
 # python sim_tools/sim.py --pid 104 0.8 205 --out-min -0.0 --out-max 100.0 --sampletime 5 --delay 15.0 --setpoint 45.0 --interval 20 --initial-values "{'kettle_temp': 40.0}" --constant-values "{'ambient_temp': 20.0, 'volume': 70.0, 'diameter': 50.0, 'heater_power': 6.0, 'heat_loss_factor': 1.0}" --plant Kettle
 # Pendulum:
-# python sim_tools/sim.py --pid 15 10 0 --out-min -15.0 --out-max 15.0 --sampletime 0.01 --delay 0.03 --setpoint 3.1415 --interval 0.5 --initial-values "{'theta0': 0.1}" --constant-values "{'length': 1.0}" --plant InvertedPendulum
+# python sim_tools/sim.py --pid 2 0 0 --out-min -3.0 --out-max 3.0 --sampletime 0.05 --delay 0.0 --setpoint 3.141592653589793 --interval 2 --initial-values "{'theta0': 0.1}" --constant-values "{'length': 0.5}" --plant InvertedPendulum
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
