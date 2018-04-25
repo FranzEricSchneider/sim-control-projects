@@ -82,6 +82,10 @@ def simulate_system(args):
         sim.plant.plot_energy()
     except AttributeError:
         pass
+    try:
+        sim.plant.animate_system()
+    except AttributeError:
+        pass
 
 
 def simulation_update(simulation, timestamp, output, args):

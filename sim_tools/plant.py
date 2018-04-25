@@ -1,3 +1,4 @@
+import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.integrate as integrate
@@ -156,7 +157,7 @@ class InvertedPendulum(object):
         state_vector = [self._x, self._x_dot, self._theta, self._theta_dot]
         # updated_state_vector contains [x, x_dot, theta, theta_dot] over the linspace timespan
         updated_state_vector = integrate.odeint(
-            func=self.pendulum_ode,
+            func=self._pendulum_ode,
             y0=state_vector,
             t=t_span,
             args=(acceleration, )
@@ -208,11 +209,64 @@ class InvertedPendulum(object):
         plt.title('Energy in the pendulum point mass')
         plt.show()
 
+    def animate_system(self):
+        '''
+        TODO: Take from double_pendulum
+        '''
+        history = self._state_history.copy()
+
+        t_span = history[:, 0]
+        dt = np.average(np.diff(t_span))
+
+        # Create an (n,) and (n, 2) set of arrays
+        cart_x = history[:, 1]
+        pendulum_xy = np.array([
+            history[:, 1] - np.sin(history[:, 3]),
+            np.cos(history[:, 3]),
+        ]).T
+
+        figure = plt.figure()
+        axes = figure.add_subplot(111, autoscale_on=False, xlim=(-2, 10), ylim=(-2, 2))
+        axes.set_aspect('equal')
+        axes.grid()
+
+        line, = axes.plot([], [], 'o-', lw=2)
+        cart_point, = axes.plot([], [], 'o', markersize=20)
+        pendulum_point, = axes.plot([], [], 'o', markersize=10)
+        time_text = axes.text(0.05, 0.9, '', transform=axes.transAxes)
+
+        def initialize_animation():
+            line.set_data([], [])
+            cart_point.set_data([], [])
+            pendulum_point.set_data([], [])
+            time_text.set_text('')
+            return line, cart_point, pendulum_point, time_text
+
+        def animate(i):
+            line_x_values = [cart_x[i], pendulum_xy[i, 0]]
+            line_y_values = [0.0, pendulum_xy[i, 1]]
+
+            line.set_data(line_x_values, line_y_values)
+            cart_point.set_data(cart_x[i], 0.0)
+            pendulum_point.set_data(pendulum_xy[i, 0], pendulum_xy[i, 1])
+            time_text.set_text('time={:.1f}s'.format(t_span[i]))
+            return line, cart_point, pendulum_point, time_text
+
+        pendulumAnimation = animation.FuncAnimation(
+            figure,
+            animate,
+            np.arange(1, t_span.shape[0]),
+            interval=int(dt * 1e3),
+            blit=True,
+            init_func=initialize_animation)
+
+        plt.show()
+
     def _save_state(self, updated_state_vector_w_time):
         self._state_history = np.vstack((self._state_history,
                                          updated_state_vector_w_time))
 
-    def pendulum_ode(self, state_vector, t, command_x_ddot):
+    def _pendulum_ode(self, state_vector, t, command_x_ddot):
         '''
         Constructs a derivatized vector that can be passed into an integrator.
         Here, it will output a vector [x_dot, x_ddot, theta_dot, theta_ddot]
