@@ -27,18 +27,20 @@ class Kettle(object):
     # thermal conductivity of steel: lambda = 15 W / m * K
     THERMAL_CONDUCTIVITY_STEEL = 15
 
-    def __init__(self, diameter, volume, initial_temp, heater_power,
-                 ambient_temp, heat_loss_factor, density=1):
-        self._mass = volume * density
-        self._temp = initial_temp
-        self._heater_power = heater_power
-        self._ambient_temp = ambient_temp
-        self._heat_loss_factor = heat_loss_factor
-        radius = diameter / 2
+    def __init__(self, initial, constants):
 
+        self._temp = initial.get('kettle_temp', 40.0)
+
+        volume = constants.get('volume', 70.0)
+        self._mass = (volume * constants.get('density', 1.0))
+        self._heater_power = constants.get('heater_power', 6.0)
+        self._ambient_temp = constants.get('ambient_temp', 20.0)
+        self._heat_loss_factor = constants.get('heat_loss_factor', 1.0)
+
+        # radius in cm
+        radius = constants.get('diameter', 50.0) / 2
         # height in cm
         height = (volume * 1000) / (np.pi * np.power(radius, 2))
-
         # surface in m^2
         self._surface = (2 * np.pi * np.power(radius, 2) + 2 * np.pi * radius * height) / 10000
 
@@ -112,16 +114,20 @@ class InvertedPendulum(object):
         theta_dot0: Initial arm angular velocity (rad/s)
     """
 
-    def __init__(self, length, mass, x0, x_dot0, theta0, theta_dot0):
-        self._length = length
-        self._mass = mass
-        self._x = x0
-        self._x_dot = x_dot0
-        self._theta = theta0
-        self._theta_dot = theta_dot0
+    def __init__(self, initial, constants):
+        self._length = constants.get('length', 1.0)
+        self._mass = constants.get('mass', 0.25)
+        self._x = initial.get('x0', 0.0)
+        self._x_dot = initial.get('x_dot0', 0.0)
+        self._theta = initial.get('theta0', 0.0)
+        self._theta_dot = initial.get('theta_dot0', 0.0)
         self._elapsed_time = 0.0
         self._state_history = np.array([[
-            self._elapsed_time, x0, x_dot0, theta0, theta_dot0
+            self._elapsed_time,
+            self._x,
+            self._x_dot,
+            self._theta,
+            self._theta_dot,
         ]])
 
     @property
