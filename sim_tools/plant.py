@@ -102,6 +102,8 @@ class Kettle(object):
         return ((power * duration) / (Kettle.SPECIFIC_HEAT_CAP_WATER * self._mass))
 
 
+# TODO: Read this:
+# http://ctms.engin.umich.edu/CTMS/index.php?example=InvertedPendulum&section=SystemModeling
 class InvertedPendulum(object):
     """
     A simulated inverted pendulum on a cart.
@@ -226,7 +228,7 @@ class InvertedPendulum(object):
         ]).T
 
         figure = plt.figure()
-        axes = figure.add_subplot(111, autoscale_on=False, xlim=(-2, 10), ylim=(-2, 2))
+        axes = figure.add_subplot(111, autoscale_on=False, xlim=(-10, 10), ylim=(-2, 2))
         axes.set_aspect('equal')
         axes.grid()
 

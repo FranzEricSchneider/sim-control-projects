@@ -148,7 +148,7 @@ def plot_simulation(simulation, title):
 # Kettle
 # python sim_tools/sim.py --pid 104 0.8 205 --out-min -0.0 --out-max 100.0 --sampletime 5 --delay 15.0 --setpoint 45.0 --interval 20 --initial-values "{'kettle_temp': 40.0}" --constant-values "{'ambient_temp': 20.0, 'volume': 70.0, 'diameter': 50.0, 'heater_power': 6.0, 'heat_loss_factor': 1.0}" --plant Kettle
 # Pendulum:
-# python sim_tools/sim.py --pid 2 0 0 --out-min -3.0 --out-max 3.0 --sampletime 0.05 --delay 0.0 --setpoint 3.141592653589793 --interval 2 --initial-values "{'theta0': 0.1}" --constant-values "{'length': 0.5}" --plant InvertedPendulum
+# python sim_tools/sim.py --pid 20 0.8 5 --out-min -10.0 --out-max 10.0 --sampletime 0.01 --delay 0.0 --setpoint 0.0 --interval 0.25 --initial-values "{'theta0': 0.3}" --constant-values "{'length': 0.5}" --plant InvertedPendulum
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
