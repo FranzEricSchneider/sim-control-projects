@@ -25,10 +25,10 @@ def simulate_system(args):
     initial['kettle_temp'] = initial.get('kettle_temp', 40.0)
     constants = literal_eval(args.constant_values)
     assert isinstance(constants, dict)
-    constants['ambient_temp'] = constants.get('ambient_temp', 20.0)
-    constants['volume'] = constants.get('volume', 70.0)
     constants['diameter'] = constants.get('diameter', 50.0)
+    constants['volume'] = constants.get('volume', 70.0)
     constants['heater_power'] = constants.get('heater_power', 6.0)
+    constants['ambient_temp'] = constants.get('ambient_temp', 20.0)
     constants['heat_loss_factor'] = constants.get('heat_loss_factor', 1.0)
 
     # Create a simulation for the tuple pid(kp, ki, kd)
@@ -44,7 +44,10 @@ def simulate_system(args):
             time=lambda: timestamp),
         plant=Kettle(diameter=constants['diameter'],
                      volume=constants['volume'],
-                     initial_temp=initial['kettle_temp']),
+                     initial_temp=initial['kettle_temp'],
+                     heater_power=constants['heater_power'],
+                     ambient_temp=constants['ambient_temp'],
+                     heat_loss_factor=constants['heat_loss_factor']),
         delayed_states=deque(maxlen=delayed_samples_len),
         timestamps=[],
         plant_states=[],
@@ -66,17 +69,15 @@ def simulate_system(args):
         output = min(output, args.out_max)
         # Calculates the effects of the controller output on the next sensor
         # reading
-        simulation_update(sim, timestamp, output, args, constants)
+        simulation_update(sim, timestamp, output, args)
 
     title = 'PID simulation, {0:.1f}l kettle, {1:.1f}kW heater, {2:.1f}s delay'.format(
         constants['volume'], constants['heater_power'], args.delay)
     plot_simulation(sim, title)
 
 
-def simulation_update(simulation, timestamp, output, args, constants=None):
-    simulation.plant.update(output,
-                            duration=args.sampletime,
-                            constants=constants)
+def simulation_update(simulation, timestamp, output, args):
+    simulation.plant.update(output, duration=args.sampletime)
     # Add a state reading to the delayed_states queue, which bumps an element
     # off the front
     simulation.delayed_states.append(simulation.plant.sensable_state)

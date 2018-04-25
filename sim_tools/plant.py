@@ -12,10 +12,14 @@ class Kettle(object):
     A simulated brewing kettle.
 
     Args:
-        diameter (float): Kettle diameter in centimeters.
-        volume (float): Content volume in liters.
-        initial_temp (float): Initial content temperature in degree celsius.
-        density (float): Content density.
+        diameter: Kettle diameter in centimeters.
+        volume: Content volume in liters.
+        initial_temp: Initial content temperature in degree celsius.
+        density: Content density.
+        heater_power: Kilo-wattage of the heater for scaling the PID output (PID
+            output is a percentage)
+        ambient_temp: See docstring for _cool
+        heat_loss_factor: See docstring for _cool
     """
     # specific heat capacity of water: c = 4.182 kJ / kg * K
     SPECIFIC_HEAT_CAP_WATER = 4.182
@@ -23,9 +27,13 @@ class Kettle(object):
     # thermal conductivity of steel: lambda = 15 W / m * K
     THERMAL_CONDUCTIVITY_STEEL = 15
 
-    def __init__(self, diameter, volume, initial_temp, density=1):
+    def __init__(self, diameter, volume, initial_temp, heater_power,
+                 ambient_temp, heat_loss_factor, density=1):
         self._mass = volume * density
         self._temp = initial_temp
+        self._heater_power = heater_power
+        self._ambient_temp = ambient_temp
+        self._heat_loss_factor = heat_loss_factor
         radius = diameter / 2
 
         # height in cm
@@ -41,7 +49,7 @@ class Kettle(object):
         """
         return self._temp
 
-    def update(self, output, duration, constants):
+    def update(self, output, duration):
         '''
         Update the internal state of the kettle based on the controller output
         (power), the simulation constants (duration), and some external factors
@@ -49,35 +57,29 @@ class Kettle(object):
 
         Args:
             See arguments of heat and cool
-            Expected constants:
-                ambient_temp
-                efficiency=0.98
-                heat_loss_factor=1
         '''
-        power = (output / 100) * constants['heater_power']
-        ambient_temp = constants['ambient_temp']
-        heat_loss_factor = constants['heat_loss_factor']
-        self.heat(power, duration)
-        self.cool(duration, ambient_temp, heat_loss_factor)
+        power = (output / 100) * self._heater_power
+        self._heat(power, duration)
+        self._cool(duration, self._ambient_temp, self._heat_loss_factor)
 
-    def heat(self, power, duration, efficiency=0.98):
+    def _heat(self, power, duration, efficiency=0.98):
         """Heat the kettle's content.
 
         Args:
-            power (float): The power in kW.
-            duration (float): The duration in seconds.
-            efficiency (float): The efficiency as number between 0 and 1.
+            power: The power in kW.
+            duration: The duration in seconds.
+            efficiency: The efficiency as number between 0 and 1.
         """
         self._temp += self._get_deltaT(power * efficiency, duration)
         return self._temp
 
-    def cool(self, duration, ambient_temp, heat_loss_factor=1):
+    def _cool(self, duration, ambient_temp, heat_loss_factor=1):
         """Make the content loose heat.
 
         Args:
-            duration (float): The duration in seconds.
-            ambient_temp (float): The ambient temperature in degree celsius.
-            heat_loss_factor (float): Increase or decrease the heat loss by a
+            duration: The duration in seconds.
+            ambient_temp: The ambient temperature in degree celsius.
+            heat_loss_factor: Increase or decrease the heat loss by a
             specified factor.
         """
         # Q = k_w * A * (T_kettle - T_ambient)
@@ -130,7 +132,7 @@ class InvertedPendulum(object):
         """
         return self._theta
 
-    def update(self, acceleration, duration, constants=None):
+    def update(self, acceleration, duration):
         '''
         Update the internal state of the cart based on the given acceleration
         TODO: Break this down further into more things? Like motor voltage
@@ -141,7 +143,6 @@ class InvertedPendulum(object):
         Args:
             acceleration: Applied cart acceleration (m/s^2)
             duration: Amount of time to step forward with odeint (s)
-            constants: Unused in this plant
         '''
         t_span = np.linspace(self._elapsed_time,
                              self._elapsed_time + duration,
