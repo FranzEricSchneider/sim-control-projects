@@ -215,16 +215,21 @@ class InvertedPendulum(object):
         '''
         TODO: Take from double_pendulum
         '''
+        # TODO: Maybe make this based on dt?
+        downsample = 50
+        scaling = 0.5
+
         history = self._state_history.copy()
 
-        t_span = history[:, 0]
-        dt = np.average(np.diff(t_span))
+        t_span = history[::downsample, 0]
+        dt = np.average(np.diff(t_span)) * scaling
+        print 'dt', dt
 
         # Create an (n,) and (n, 2) set of arrays
-        cart_x = history[:, 1]
+        cart_x = history[::downsample, 1]
         pendulum_xy = np.array([
-            history[:, 1] - np.sin(history[:, 3]),
-            np.cos(history[:, 3]),
+            history[::downsample, 1] - np.sin(history[::downsample, 3]),
+            np.cos(history[::downsample, 3]),
         ]).T
 
         figure = plt.figure()
