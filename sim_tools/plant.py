@@ -223,7 +223,6 @@ class InvertedPendulum(object):
 
         t_span = history[::downsample, 0]
         dt = np.average(np.diff(t_span)) * scaling
-        print 'dt', dt
 
         # Create an (n,) and (n, 2) set of arrays
         cart_x = history[::downsample, 1]

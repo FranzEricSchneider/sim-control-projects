@@ -53,6 +53,9 @@ def simulate_system(args):
         sim.delayed_states.maxlen * [sim.plant.sensable_state]
     )
 
+    # Calculate the allowable output change in a single step
+    allowable_change = args.output_rate_limit * args.sampletime
+
     # Run simulation for specified interval. The (x60) is because args.interval
     # is in minutes and we want seconds
     while timestamp < (args.interval * 60):
@@ -69,9 +72,11 @@ def simulate_system(args):
         if args.supress_output:
             output = 0.0
         else:
-            output = sim.controller.calc(sensor_state, args.setpoint)
-            output = max(output, args.out_min)
-            output = min(output, args.out_max)
+            # Calculate the next desired output
+            output = sim.controller.calc(input_val=sensor_state,
+                                         setpoint=args.setpoint,
+                                         max_allowable_change=allowable_change)
+
         # Calculates the effects of the controller output on the next sensor
         # reading
         simulation_update(sim, timestamp, output, args)
@@ -158,7 +163,8 @@ Kettle
 python sim_tools/sim.py --pid 104 0.8 205 --out-min -0.0 --out-max 100.0 --sampletime 5 --delay 15.0 --setpoint 45.0 --interval 20 --initial-values "{'kettle_temp': 40.0}" --constant-values "{'ambient_temp': 20.0, 'volume': 70.0, 'diameter': 50.0, 'heater_power': 6.0, 'heat_loss_factor': 1.0}" --plant Kettle
 Pendulum:
 python sim_tools/sim.py --pid 20 0.8 5 --out-min -10.0 --out-max 10.0 --sampletime 0.01 --delay 0.0 --setpoint 0.0 --interval 0.2 --initial-values "{'theta0': 0.3, 'x0': 5}" --constant-values "{'length': 0.5}" --plant InvertedPendulum
-python sim_tools/sim.py --pid 20 0.8 5 --out-min -5.0 --out-max 5.0 --sampletime 0.01 --delay 0.01 --setpoint 0.0 --interval 0.2 --initial-values "{'theta_dot0': -0.75, 'x0': -5}" --constant-values "{'length': 1}" --plant InvertedPendulum --sensor-noise-std-dev 0.0075
+python sim_tools/sim.py --pid 20 0.8 5 --out-min -5.0 --out-max 5.0 --sampletime 0.01 --delay 0.01 --setpoint 0.0 --interval 0.2 --initial-values "{'theta_dot0': 0, 'x0': 0}" --constant-values "{'length': 1}" --plant InvertedPendulum --sensor-noise-std-dev 0.005 --output-rate-limit 30
+allowable_change 0.3
 '''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -222,6 +228,13 @@ if __name__ == '__main__':
         default=0.0,
         type=float,
         help='Std deviation of gaussian noise applied to the sensor readings')
+    parser.add_argument(
+        '--output-rate-limit',
+        default=1e6,
+        type=float,
+        help='Limiting rate of output. This will be multiplied by the sample'
+             ' time, and the result will cap the output change each timestep.'
+             ' If the output is m/s^2, the limit is, by definition, m/s^3')
 
     parser.add_argument(
         '--constant-values',

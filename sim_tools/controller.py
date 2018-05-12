@@ -1,5 +1,6 @@
-from time import time
 import logging
+import numpy as np
+from time import time
 
 
 # Based on Arduino PID Library
@@ -43,7 +44,7 @@ class PIDArduino(object):
         self._last_calc_timestamp = 0
         self._time = time
 
-    def calc(self, input_val, setpoint):
+    def calc(self, input_val, setpoint, max_allowable_change):
         """Adjusts and holds the given setpoint.
 
         Args:
@@ -73,9 +74,16 @@ class PIDArduino(object):
         d = -(self._Kd * input_diff)
 
         # Compute PID Output
+        previous_output = self._last_output
         self._last_output = p + i + d
+        # Put limits on the output signal
         self._last_output = min(self._last_output, self._out_max)
         self._last_output = max(self._last_output, self._out_min)
+        # Make sure the change isn't too abrupt
+        delta_output = self._last_output - previous_output
+        if abs(delta_output) > max_allowable_change:
+            self._last_output = previous_output + \
+                                np.sign(delta_output) * max_allowable_change
 
         # Log some debug info
         self._logger.debug('P: {0}'.format(p))
