@@ -58,8 +58,11 @@ def simulate_system(args):
     while timestamp < (args.interval * 60):
         timestamp += args.sampletime
 
-        # Make noise from -1 to 1, then scale by maximum
-        sensor_noise = ((np.random.random() - 0.5) * 2) * args.sensor_noise_max
+        # Make noise centered around 0 w/ a given stddev
+        if args.sensor_noise_std_dev <= 0.0:
+            sensor_noise = 0.0
+        else:
+            sensor_noise = np.random.normal(scale=args.sensor_noise_std_dev)
         sensor_state = sim.delayed_states[0] + sensor_noise
 
         # Calculates controller reaction
@@ -155,7 +158,7 @@ Kettle
 python sim_tools/sim.py --pid 104 0.8 205 --out-min -0.0 --out-max 100.0 --sampletime 5 --delay 15.0 --setpoint 45.0 --interval 20 --initial-values "{'kettle_temp': 40.0}" --constant-values "{'ambient_temp': 20.0, 'volume': 70.0, 'diameter': 50.0, 'heater_power': 6.0, 'heat_loss_factor': 1.0}" --plant Kettle
 Pendulum:
 python sim_tools/sim.py --pid 20 0.8 5 --out-min -10.0 --out-max 10.0 --sampletime 0.01 --delay 0.0 --setpoint 0.0 --interval 0.2 --initial-values "{'theta0': 0.3, 'x0': 5}" --constant-values "{'length': 0.5}" --plant InvertedPendulum
-python sim_tools/sim.py --pid 20 0.8 5 --out-min -5.0 --out-max 5.0 --sampletime 0.01 --delay 0.05 --setpoint 0.0 --interval 0.2 --initial-values "{'theta_dot0': -1, 'x0': -5}" --constant-values "{'length': 0.5}" --plant InvertedPendulum --sensor-noise-max 0.01
+python sim_tools/sim.py --pid 20 0.8 5 --out-min -5.0 --out-max 5.0 --sampletime 0.01 --delay 0.01 --setpoint 0.0 --interval 0.2 --initial-values "{'theta_dot0': -0.75, 'x0': -5}" --constant-values "{'length': 1}" --plant InvertedPendulum --sensor-noise-std-dev 0.0075
 '''
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -177,7 +180,6 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-s', '--setpoint',
-        metavar='T',
         default=45.0,
         type=float,
         help='target sensor value')
@@ -216,10 +218,10 @@ if __name__ == '__main__':
         type=float,
         help='maximum PID controller output')
     parser.add_argument(
-        '--sensor-noise-max',
+        '--sensor-noise-std-dev',
         default=0.0,
         type=float,
-        help='Maximum noise that will be applied to the sensor readings')
+        help='Std deviation of gaussian noise applied to the sensor readings')
 
     parser.add_argument(
         '--constant-values',
